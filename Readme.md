@@ -1,6 +1,6 @@
 # SQLite LSM port for Windows
 
-## Intorduction
+## Introduction
 LSM is an embedded database library for key-value data, roughly similar in scope to [Berkeley DB](http://www.oracle.com/technetwork/products/berkeleydb/overview/index.html), [LevelDB](http://code.google.com/p/leveldb/) or [KyotoCabinet](http://fallabs.com/kyotocabinet/). Both keys and values are specified and stored as byte arrays. Duplicate keys are not supported. Keys are always sorted in memcmp() order. LSM supports the following operations for the manipulation and query of database data:
 
 *   Writing a new key and value into the database.

@@ -21,17 +21,11 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="lsm.h">
-      <Filter>LSM</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="lsmInt.h">
-      <Filter>LSM</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

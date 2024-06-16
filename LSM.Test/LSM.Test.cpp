@@ -10,14 +10,16 @@
 #include <sstream>      // std::stringstream
 #include <iomanip>
 #include <thread>
+#include "lsmint.h"
 
 using namespace std;
+// compiled as 32 bit need /LARGEADDRESSAWARE linker option for MapViewOfFile > 2 gb when LSM_CONFIG_MMAP is on
 
-#define TOTAL 3e6
-#define CHUNKS 50000 // no writes in transaction
+#define TOTAL_WRITES  20e6 
+#define NO_WRITES_TRANSACTION (TOTAL_WRITES/10) //50000 // no writes in transaction
+#define RECORD_SIZE 100
 
-
-double runInserts(lsm_db *db, int start, int end) {
+void runInserts(lsm_db *db, int start, int end) {
   char Key[128];
   char Val[512];
   int rc, bytes;
@@ -25,7 +27,8 @@ double runInserts(lsm_db *db, int start, int end) {
   //long long valueLength = 0;
   LARGE_INTEGER sum = { 0 };
   LARGE_INTEGER pcFreq = { 0 };
-  
+  int recordsinserted = 0;
+
   QueryPerformanceFrequency(&pcFreq);
   double freq = double(pcFreq.QuadPart) / 1000;
   ULONG failedAttempts = 0;
@@ -43,7 +46,7 @@ double runInserts(lsm_db *db, int start, int end) {
 
     sprintf(Key, "key:%d", i );//<< ":" << guid.Data1 << "-" << guid.Data2 << "-" << guid.Data3;
     //for (int j = 0; j < 128; j++) {
-    sprintf(Val, "value:%d______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________", i+1000);//  valuess << "value" << i+1000 << endl;
+    sprintf(Val, "value:%d", i+1000);//  valuess << "value" << i+1000 << endl;
     //}
 
     //string sKey = keyss.str();
@@ -51,14 +54,14 @@ double runInserts(lsm_db *db, int start, int end) {
     //const char *pKey = sKey.c_str();
     int nKey = strlen(Key);// sKey.length();
     //const char *pVal = sVal.c_str();
-    int nVal = strlen(Val); //sVal.length();
+    int nVal = RECORD_SIZE;// strlen(Val); //sVal.length();
 
     
     while (lsm_insert(db, Key, nKey, Val, nVal) == LSM_BUSY) {
       failedAttempts++;
       Sleep(1);
     }
-    
+    recordsinserted++;
     /*if (!(i % 10000)) {
         int nOld, nLive;
         rc = lsm_info(db, LSM_INFO_TREE_SIZE, &nOld, &nLive);
@@ -84,7 +87,9 @@ double runInserts(lsm_db *db, int start, int end) {
   QueryPerformanceCounter(&stop);
   sum.QuadPart += (stop.QuadPart - start1.QuadPart);
 
-return double(sum.QuadPart) / freq;
+  double timeTaken = double(sum.QuadPart) / freq;
+  cout << "records " << end << " inserts/s " << (double)(recordsinserted * 1000 / timeTaken) << " seconds " << timeTaken / 1000.0 << endl;
+
 }
 
 
@@ -92,9 +97,8 @@ void insertionThread(lsm_db *lpParameter)
 {
   lsm_db *db = (lsm_db *)lpParameter;
   
-  for (int i = 0; i <= TOTAL; i+= CHUNKS) {
-    double timeTaken = runInserts(db, i, i + (CHUNKS-1));
-    cout << "record " << i << " inserts/s " << (double)(CHUNKS *1000/timeTaken) << " seconds " << timeTaken/1000.0 << endl;
+  for (int i = 0; i <= TOTAL_WRITES; i+= NO_WRITES_TRANSACTION) {
+    runInserts(db, i, i + (NO_WRITES_TRANSACTION -1));
   }
 
 }
@@ -127,7 +131,7 @@ void readerThread(lsm_db *db, int id) {
     if ( seekrc == LSM_OK  && validrc) {
     //while (lsm_csr_next(csr) == LSM_OK /* && lsm_csr_valid(csr)*/) {
       do {
-            char* pKey, * pVal;
+/*            char* pKey, * pVal;
             int nKey, nVal;
             lsm_csr_key(csr, (const void**)&pKey, &nKey);
             lsm_csr_value(csr, (const void**)&pVal, &nVal);
@@ -136,7 +140,7 @@ void readerThread(lsm_db *db, int id) {
             actualKey[nKey] = 0;
             char actualVal[512];
             memcpy(actualVal, pVal, nVal);
-            actualVal[nVal] = 0;
+            actualVal[nVal] = 0;*/
             totalkeysfound++;
             //cout << " - " << id << " Found key " << actualKey << " val =" << actualVal << endl;
         } while (lsm_csr_next(csr) == LSM_OK && lsm_csr_valid(csr));
@@ -170,8 +174,8 @@ int main()
   //lsm_config(db, LSM_CONFIG_AUTOFLUSH, &iVal);
   //iVal = 8192;
   //lsm_config(db, LSM_CONFIG_AUTOCHECKPOINT, &iVal);
-  //iVal = 1;
-  //lsm_config(db2, LSM_CONFIG_MMAP, &iVal);
+  iVal = 32768;
+  lsm_config(db, LSM_CONFIG_MMAP, &iVal);
   //iVal = 2;
   //lsm_config(db, LSM_CONFIG_AUTOMERGE, &iVal);
 
@@ -218,8 +222,22 @@ int main()
   t2.join();
 
   //rc = lsm_close(db2);
-  rc = lsm_work(db, 1, -1, 0);// merges all segments into one.i.e.it rewrites the entire database to be a single optimized b - tree.
+//  rc = lsm_work(db, 1, -1, 0);// merges all segments into one.i.e.it rewrites the entire database to be a single optimized b - tree.
   rc = lsm_flush(db);
+  //rc = lsmBeginWork(db);
+  //rc = lsmFsIntegrityCheck(db);
+  /*lsmSortedDumpStructure(
+      db,                    // Database handle (used for xLog callback) 
+      db->pWorker,                // Snapshot to dump 
+      1,                      // Output the keys from each segment 
+      1,                      // Output the values from each segment 
+      "dump of db");                // Caption to print near top of dump 
+
+  lsmFinishWork(db, 0, &rc);
+  if (rc == LSM_OK)
+      printf ("db is ok\n");
+  else
+      printf ("db error %d\n",rc);*/
   rc = lsm_close(db);
   return 0;
 }

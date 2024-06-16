@@ -14,6 +14,10 @@
 #ifndef _LSM_INT_H
 #define _LSM_INT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "lsm.h"
 #include <assert.h>
 #include <string.h>
@@ -747,8 +751,8 @@ u8 *lsmFsMetaPageData(MetaPage *, int *);
 
 #ifdef LSM_DEBUG
 int lsmFsDbPageIsLast(Segment *pSeg, Page *pPg);
-int lsmFsIntegrityCheck(lsm_db *);
 #endif
+int lsmFsIntegrityCheck(lsm_db*);
 
 LsmPgno lsmFsRedirectPage(FileSystem *, Redirect *, LsmPgno);
 
@@ -993,5 +997,9 @@ int lsmStrlen(const char *zName);
 
 #define LSM_MIN(x,y) ((x)>(y) ? (y) : (x))
 #define LSM_MAX(x,y) ((x)>(y) ? (x) : (y))
+
+#ifdef __cplusplus
+}  /* End of the 'extern "C"' block */
+#endif
 
 #endif
